@@ -19,8 +19,10 @@
                 #:unwind-protect
                 #:*package*
                 #:&body
-                #:get-universal-time
-                #:- #:setf
+                #:get-internal-run-time
+                #:float
+                #:/ #:- #:setf
+                #:internal-time-units-per-second
                 #:gethash
                 #:list #:lambda)
   (:export #:configure ; Reexported from metric-impl

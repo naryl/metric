@@ -12,11 +12,13 @@
 (defmacro time ((name) &body body)
   "Executes BODY and records its execution time in a metric called NAME"
   (alexandria:with-gensyms (time)
-    `(let ((,time (get-universal-time)))
+    `(let ((,time (get-internal-run-time)))
        (unwind-protect
             (progn
               ,@body)
-         (metric-impl:measure% ,name (- (get-universal-time) ,time) ,*package*)))))
+         (metric-impl:measure% ,name (float (/ (- (get-internal-run-time) ,time)
+                                               internal-time-units-per-second))
+                               ,*package*)))))
 
 (defmacro defmetric (name (metric-name) &body body)
   "Defines a metric to be calculated and sent along with each heap of data once per

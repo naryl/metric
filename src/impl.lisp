@@ -32,17 +32,17 @@
   INTERVAL is how often to send metrics
   Returns t if Graphite is available"
   (when (and *timer*
-             (sb-ext:timer-scheduled-p *timer*))
-    (sb-ext:unschedule-timer *timer*))
-  (setf *timer* (sb-ext:make-timer #'report :name "Graphite reporter" :thread t))
-  (sb-ext:schedule-timer *timer* interval :repeat-interval interval)
+			 (sb-ext:timer-scheduled-p *timer*))
+	(sb-ext:unschedule-timer *timer*))
   (setf  *host* host
          *port* port)
   ;; Check that the server is available
   (ignore-errors
     (let ((socket (socket-connect host port :timeout 1)))
       (socket-close socket)
-      t)))
+	  (setf *timer* (sb-ext:make-timer #'report :name "Graphite reporter" :thread t))
+	  (sb-ext:schedule-timer *timer* interval :repeat-interval interval)
+	  t)))
 
 (defgeneric report-metric (name metric stream time))
 
