@@ -1,8 +1,6 @@
 
 (in-package metric-impl)
 
-(declaim (optimize (debug 3) (safety 3) (speed 0)))
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defmacro with-socket ((stream-var host port) &body body)
     (with-gensyms (socket)
