@@ -1,26 +1,26 @@
 
-(cl:in-package metric)
+(in-package metric)
 
-(cl:defmacro measure (name value)
+(defmacro measure (name value)
   "Stores a cumulative metric named NAME. Results are sent per configured intervals."
-  `(metric-impl::measure% ,name ,value ,cl:*package*))
+  `(metric-impl:measure% ,name ,value ,*package*))
 
-(cl:defmacro count (name)
+(defmacro count (name)
   "Increments a counter named NAME. Counters are sent and reset per configured intervals"
-  `(metric-impl::count% ,name ,cl:*package*))
+  `(metric-impl:count% ,name ,*package*))
 
-(cl:defmacro time ((name) cl:&body body)
+(defmacro time ((name) &body body)
   "Executes BODY and records its execution time in a metric called NAME"
   (alexandria:with-gensyms (time)
-    `(cl:let ((,time (cl:get-universal-time)))
-       (cl:unwind-protect
-            (cl:progn
+    `(let ((,time (get-universal-time)))
+       (unwind-protect
+            (progn
               ,@body)
-         (metric-impl::report-metric ,name (cl:- (cl:get-universal-time) ,time))))))
+         (metric-impl:measure% ,name (- (get-universal-time) ,time) ,*package*)))))
 
-(cl:defmacro defmetric (name (metric-name) cl:&body body)
+(defmacro defmetric (name (metric-name) &body body)
   "Defines a metric to be calculated and sent along with each heap of data once per
   configured interval"
-  `(cl:setf (cl:gethash ',name metric-impl::*defined-metrics*)
-         (cl:list ,metric-name
-               (cl:lambda () ,@body))))
+  `(setf (gethash ',name metric-impl:*defined-metrics*)
+            (list (metric-impl:make-name ,metric-name ,*package*)
+                  (lambda () ,@body))))

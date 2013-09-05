@@ -1,5 +1,6 @@
 
 (defsystem metric
+  :serial t
   :pathname "src/"
   :components ((:file "package")
                (:file "impl")
