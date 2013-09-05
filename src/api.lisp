@@ -16,7 +16,7 @@
        (cl:unwind-protect
             (cl:progn
               ,@body)
-         (metric-impl::report-metric ,name (- (cl:get-universal-time) ,time))))))
+         (metric-impl::report-metric ,name (cl:- (cl:get-universal-time) ,time))))))
 
 (cl:defmacro defmetric (name (metric-name) cl:&body body)
   "Defines a metric to be calculated and sent along with each heap of data once per
