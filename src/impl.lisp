@@ -25,14 +25,18 @@
 (defvar *metrics* (new-ht))
 (defvar *running* nil)
 
-(defun configure (&key
+(defun configure (prefix
+                  &key
                     (host "localhost")
                     (port 2003)
-                    (interval 60)
-                    (prefix nil))
+                    (interval 60))
   "HOST:PORT is Graphite's socket address
   INTERVAL is how often to send metrics
+  PREFIX is a string prepended to all metric names. If NIL nothing is actually started
   Returns t if Graphite is available"
+  (when (null prefix)
+    (warn "Called metric:configure with null PREFIX. Not starting.")
+    (return-from configure nil))
   (when (and *timer*
              (sb-ext:timer-scheduled-p *timer*))
     (sb-ext:unschedule-timer *timer*))
@@ -40,12 +44,12 @@
   (ignore-errors
     (let ((socket (socket-connect host port :timeout 1)))
       (socket-close socket)
-	  ;; It is
-	  (setf  *host* host
-			 *port* port
-			 *prefix* prefix
-			 *metrics* (new-ht)
-			 *running* t)
+      ;; It is
+      (setf  *host* host
+             *port* port
+             *prefix* prefix
+             *metrics* (new-ht)
+             *running* t)
       (setf *timer* (sb-ext:make-timer #'report :name "Graphite reporter" :thread t))
       (sb-ext:schedule-timer *timer* interval :repeat-interval interval)
       t)))
@@ -96,17 +100,17 @@
 
 (defun measure% (name value package)
   (when *running*
-	(let ((name (make-name name package)))
-	  (let ((metric (gethash name *metrics* (make-metric))))
-		(setf (metric-min metric)
-			  (min (metric-min metric) value))
-		(setf (metric-max metric)
-			  (max (metric-max metric) value))
-		(incf (metric-count metric))
-		(incf (metric-sum metric)
-			  value)
-		(setf (gethash name *metrics*)
-			  metric)))))
+    (let ((name (make-name name package)))
+      (let ((metric (gethash name *metrics* (make-metric))))
+        (setf (metric-min metric)
+              (min (metric-min metric) value))
+        (setf (metric-max metric)
+              (max (metric-max metric) value))
+        (incf (metric-count metric))
+        (incf (metric-sum metric)
+              value)
+        (setf (gethash name *metrics*)
+              metric)))))
 
 (defmethod report-metric (name (metric metric) stream time)
   (format stream "~A.min ~A ~A~%"
@@ -129,11 +133,11 @@
 
 (defun count% (name package)
   (when *running*
-	(let ((name (make-name name package)))
-	  (let ((counter (gethash name *metrics* (make-counter))))
-		(incf (counter-count counter))
-		(setf (gethash name *metrics*)
-			  counter)))))
+    (let ((name (make-name name package)))
+      (let ((counter (gethash name *metrics* (make-counter))))
+        (incf (counter-count counter))
+        (setf (gethash name *metrics*)
+              counter)))))
 
 (defmethod report-metric (name (counter counter) stream time)
   (format stream "~A.count ~A ~A~%"
