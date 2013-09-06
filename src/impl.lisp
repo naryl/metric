@@ -13,10 +13,6 @@
 (defun new-ht ()
   (make-hash-table :test 'equal :synchronized t))
 
-(defvar *metrics* (new-ht))
-
-(defvar *timer* nil)
-
 (defvar *error-handler* #'invoke-debugger
   "Called when an error happens while submitting data to graphite")
 
@@ -24,23 +20,35 @@
 
 (defvar *host* nil)
 (defvar *port* nil)
+(defvar *timer* nil)
+(defvar *prefix* nil)
+(defvar *metrics* (new-ht))
+(defvar *running* nil)
 
-(defun configure (&key (host "localhost") (port 2003) (interval 60))
+(defun configure (&key
+                    (host "localhost")
+                    (port 2003)
+                    (interval 60)
+                    (prefix nil))
   "HOST:PORT is Graphite's socket address
   INTERVAL is how often to send metrics
   Returns t if Graphite is available"
   (when (and *timer*
-			 (sb-ext:timer-scheduled-p *timer*))
-	(sb-ext:unschedule-timer *timer*))
-  (setf  *host* host
-         *port* port)
+             (sb-ext:timer-scheduled-p *timer*))
+    (sb-ext:unschedule-timer *timer*))
   ;; Check that the server is available
   (ignore-errors
     (let ((socket (socket-connect host port :timeout 1)))
       (socket-close socket)
-	  (setf *timer* (sb-ext:make-timer #'report :name "Graphite reporter" :thread t))
-	  (sb-ext:schedule-timer *timer* interval :repeat-interval interval)
-	  t)))
+	  ;; It is
+	  (setf  *host* host
+			 *port* port
+			 *prefix* prefix
+			 *metrics* (new-ht)
+			 *running* t)
+      (setf *timer* (sb-ext:make-timer #'report :name "Graphite reporter" :thread t))
+      (sb-ext:schedule-timer *timer* interval :repeat-interval interval)
+      t)))
 
 (defgeneric report-metric (name metric stream time))
 
@@ -73,7 +81,10 @@
 
 (declaim (inline make-name))
 (defun make-name (name package)
-  (concatenate 'string (string-downcase (string (package-name package))) "." name))
+  (format nil "~@[~A.~]~A.~A"
+          *prefix*
+          (string-downcase (string (package-name package)))
+          name))
 
 ;;; Metric
 
@@ -84,17 +95,18 @@
   (sum 0 :type number))
 
 (defun measure% (name value package)
-  (let ((name (make-name name package)))
-    (let ((metric (gethash name *metrics* (make-metric))))
-      (setf (metric-min metric)
-            (min (metric-min metric) value))
-      (setf (metric-max metric)
-            (max (metric-max metric) value))
-      (incf (metric-count metric))
-      (incf (metric-sum metric)
-            value)
-      (setf (gethash name *metrics*)
-            metric))))
+  (when *running*
+	(let ((name (make-name name package)))
+	  (let ((metric (gethash name *metrics* (make-metric))))
+		(setf (metric-min metric)
+			  (min (metric-min metric) value))
+		(setf (metric-max metric)
+			  (max (metric-max metric) value))
+		(incf (metric-count metric))
+		(incf (metric-sum metric)
+			  value)
+		(setf (gethash name *metrics*)
+			  metric)))))
 
 (defmethod report-metric (name (metric metric) stream time)
   (format stream "~A.min ~A ~A~%"
@@ -116,11 +128,12 @@
   (count 0 :type integer))
 
 (defun count% (name package)
-  (let ((name (make-name name package)))
-    (let ((counter (gethash name *metrics* (make-counter))))
-      (incf (counter-count counter))
-      (setf (gethash name *metrics*)
-            counter))))
+  (when *running*
+	(let ((name (make-name name package)))
+	  (let ((counter (gethash name *metrics* (make-counter))))
+		(incf (counter-count counter))
+		(setf (gethash name *metrics*)
+			  counter)))))
 
 (defmethod report-metric (name (counter counter) stream time)
   (format stream "~A.count ~A ~A~%"
